@@ -315,15 +315,18 @@ int CMMDVMHost::run()
 	unsigned int transparentPort = 0U;
 	CUDPSocket* transparentSocket = NULL;
 
+	unsigned int sendFrameType = 0U;
 	if (m_conf.getTransparentEnabled()) {
 		std::string remoteAddress = m_conf.getTransparentRemoteAddress();
 		unsigned int remotePort   = m_conf.getTransparentRemotePort();
 		unsigned int localPort    = m_conf.getTransparentLocalPort();
+		sendFrameType             = m_conf.getTransparentSendFrameType();
 
 		LogInfo("Transparent Data");
 		LogInfo("    Remote Address: %s", remoteAddress.c_str());
 		LogInfo("    Remote Port: %u", remotePort);
 		LogInfo("    Local Port: %u", localPort);
+		LogInfo("    Send Frame Type: %u", sendFrameType);
 
 		transparentAddress = CUDPSocket::lookup(remoteAddress);
 		transparentPort    = remotePort;
@@ -334,7 +337,9 @@ int CMMDVMHost::run()
 			LogWarning("Could not open the Transparent data socket, disabling");
 			delete transparentSocket;
 			transparentSocket = NULL;
+			sendFrameType=0;
 		}
+		m_modem->setTransparentDataParams(sendFrameType);
 	}
 
 	if (m_conf.getCWIdEnabled()) {
@@ -385,6 +390,7 @@ int CMMDVMHost::run()
 		std::vector<std::string> blackList = m_conf.getDStarBlackList();
 		bool ackReply                      = m_conf.getDStarAckReply();
 		unsigned int ackTime               = m_conf.getDStarAckTime();
+		bool ackMessage                    = m_conf.getDStarAckMessage();
 		bool errorReply                    = m_conf.getDStarErrorReply();
 		bool remoteGateway                 = m_conf.getDStarRemoteGateway();
 		m_dstarRFModeHang                  = m_conf.getDStarModeHang();
@@ -393,6 +399,7 @@ int CMMDVMHost::run()
 		LogInfo("    Module: %s", module.c_str());
 		LogInfo("    Self Only: %s", selfOnly ? "yes" : "no");
 		LogInfo("    Ack Reply: %s", ackReply ? "yes" : "no");
+		LogInfo("    Ack message: %s", ackMessage ? "RSSI" : "BER");
 		LogInfo("    Ack Time: %ums", ackTime);
 		LogInfo("    Error Reply: %s", errorReply ? "yes" : "no");
 		LogInfo("    Remote Gateway: %s", remoteGateway ? "yes" : "no");
@@ -401,7 +408,7 @@ int CMMDVMHost::run()
 		if (blackList.size() > 0U)
 			LogInfo("    Black List: %u", blackList.size());
 
-		dstar = new CDStarControl(m_callsign, module, selfOnly, ackReply, ackTime, errorReply, blackList, m_dstarNetwork, m_display, m_timeout, m_duplex, remoteGateway, rssi);
+		dstar = new CDStarControl(m_callsign, module, selfOnly, ackReply, ackTime, ackMessage, errorReply, blackList, m_dstarNetwork, m_display, m_timeout, m_duplex, remoteGateway, rssi);
 	}
 
 	CTimer dmrBeaconIntervalTimer(1000U);
@@ -968,7 +975,7 @@ int CMMDVMHost::run()
 			CThread::sleep(5U);
 	}
 
-	setMode(MODE_IDLE);
+	setMode(MODE_QUIT);
 
 	m_modem->close();
 	delete m_modem;
@@ -1557,6 +1564,9 @@ void CMMDVMHost::setMode(unsigned char mode)
 			m_cwIdTimer.start();
 		}
 		m_display->setIdle();
+		if (mode==MODE_QUIT) {
+			m_display->setQuit();
+		}
 		m_mode = MODE_IDLE;
 		m_modeTimer.stop();
 		break;
